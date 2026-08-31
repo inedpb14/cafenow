@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Enums;
+
+enum PaymentStatus: string
+{
+    case Pending = 'pending';
+    case Success = 'success';
+    case Failed = 'failed';
+    case Refunded = 'refunded';
+    case RefundedOnArrival = 'refunded_on_arrival';
+    case Expired = 'expired';
+}

@@ -1,0 +1,81 @@
+/.phpunit.cache
+/bootstrap/ssr
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+/vendor
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+
+# -------------------------------------------------------
+# AI Agent configuration — jangan di-commit ke GitHub
+# -------------------------------------------------------
+
+# Antigravity IDE / Google AGY
+/.agents/
+
+# Claude Code (Anthropic)
+/.claude/
+
+# OpenCode
+/.opencode/
+/opencode.json
+
+# Scratch / temporary agent workspaces
+/.scratch/
+/.tmp/
+
+# skills-lock.json dihasilkan oleh AGY skill installer
+/skills-lock.json
+
+# -------------------------------------------------------
+# File sisa sesi debugging / analisis AI
+# -------------------------------------------------------
+/bug_fixing.md
+/ERROR_ANALYSIS_REPORT.md
+/admin-inertia-migration-report.md
+/ngrok_implementation.md
+/parse.php
+/parse_phpstan.php
+/fix_requests.php
+/docs/
+
+# File output PHPStan sementara
+/phpstan_err.txt
+/phpstan_errors.txt
+/phpstan_full.txt
+/phpstan_full_errors.txt
+/phpstan_out.txt
+/phpstan_raw.txt
+
+# -------------------------------------------------------
+# Test artifacts
+# -------------------------------------------------------
+testsprite_tests/tmp/config.json
+/test-results/
+
+# local session-cookie test artifacts
+/cookie.txt
+/c.txt
+*.cookies.txt
