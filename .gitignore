@@ -50,32 +50,36 @@ yarn-error.log
 /skills-lock.json
 
 # -------------------------------------------------------
-# File sisa sesi debugging / analisis AI
+# Sisa sesi debugging / analisis AI (sudah dirapikan ke docs/)
 # -------------------------------------------------------
-/bug_fixing.md
-/ERROR_ANALYSIS_REPORT.md
-/admin-inertia-migration-report.md
-/ngrok_implementation.md
-/parse.php
-/parse_phpstan.php
-/fix_requests.php
 /docs/
+/requirements/
 
-# File output PHPStan sementara
-/phpstan_err.txt
-/phpstan_errors.txt
-/phpstan_full.txt
-/phpstan_full_errors.txt
-/phpstan_out.txt
-/phpstan_raw.txt
+# -------------------------------------------------------
+# AI Agent working files — jangan di-commit ke GitHub
+# -------------------------------------------------------
+/AGENTS.md
+/CONTEXT.md
 
 # -------------------------------------------------------
 # Test artifacts
 # -------------------------------------------------------
-testsprite_tests/tmp/config.json
+/tests/
+/e2e/
+/testsprite_tests/
 /test-results/
+/phpunit.xml
+/pnpm-workspace.yaml
 
 # local session-cookie test artifacts
 /cookie.txt
 /c.txt
 *.cookies.txt
+
+# Playwright E2E shared run state (ids antar fase, regenerated tiap run)
+/e2e/.state/
+
+# Screenshot tool (berisi auth-*.json berisi cookie sesi)
+/screenshot-tool/
+/screenshots/
+auth-*.json

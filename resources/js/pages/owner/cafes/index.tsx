@@ -2,6 +2,8 @@ import OwnerLayout from '@/components/Owner/OwnerLayout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CAFE_PROFILE_FIELDS, cleanCafeProfile, validateCafeProfile } from '@/lib/cafe-profile';
+import type { CafeProfileForm } from '@/lib/cafe-profile';
 import { Store, MapPin, Layers, Utensils, AlertCircle, Edit2, Phone, FileText, CheckCircle2, X, Save, Camera, Clock } from 'lucide-react';
 
 const DAYS = [
@@ -31,6 +33,7 @@ interface CafeInfo {
     name: string;
     slug?: string;
     address?: string;
+    city?: string;
     phone?: string;
     description?: string;
     facilities?: string[];
@@ -45,12 +48,7 @@ interface OwnerCafesProps {
     cafe?: CafeInfo | null;
 }
 
-interface CafeFormData {
-    name: string;
-    address: string;
-    phone: string;
-    description: string;
-}
+type CafeFormData = CafeProfileForm;
 
 export default function OwnerCafes(props: OwnerCafesProps) {
     const cafe = props.cafe;
@@ -61,6 +59,7 @@ export default function OwnerCafes(props: OwnerCafesProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Partial<CafeFormData>>({});
+    const [formError, setFormError] = useState('');
     const [photoFile, setPhotoFile] = useState<File | null>(null);
     const [uploadError, setUploadError] = useState('');
     const [hoursState, setHoursState] = useState<Record<string, DayHours>>(() => {
@@ -79,6 +78,7 @@ export default function OwnerCafes(props: OwnerCafesProps) {
     const [form, setForm] = useState<CafeFormData>({
         name: cafe?.name || '',
         address: cafe?.address || '',
+        city: cafe?.city || '',
         phone: cafe?.phone || '',
         description: cafe?.description || '',
     });
@@ -96,11 +96,10 @@ export default function OwnerCafes(props: OwnerCafesProps) {
         e.preventDefault();
         setProcessing(true);
         setErrors({});
+        setFormError('');
         setUploadError('');
 
-        const newErrors: Partial<CafeFormData> = {};
-        if (!form.name.trim()) newErrors.name = 'Nama cafe wajib diisi';
-        if (!form.address.trim()) newErrors.address = 'Alamat wajib diisi';
+        const newErrors = validateCafeProfile(form);
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
@@ -108,9 +107,10 @@ export default function OwnerCafes(props: OwnerCafesProps) {
             return;
         }
 
+        const payload = cleanCafeProfile(form);
+
         const opts = {
-            onSuccess: async (page: any) => {
-                const saved = page.props.cafe as CafeInfo | null;
+            onSuccess: async (page: any) => {                const saved = page.props.cafe as CafeInfo | null;
                 if (photoFile && saved?.id) {
                     router.post(`/owner/cafes/${saved.id}/photos`, { photos: [photoFile] }, {
                         onSuccess: () => router.reload(),
@@ -124,18 +124,37 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                 }
                 setPhotoFile(null);
             },
-            onError: (errs: any) => { setErrors(errs); setProcessing(false); },
+            onError: (errs: any) => {
+                // Petakan tiap error controller ke field-nya; sisanya ke banner atas form.
+                const known: (keyof CafeFormData)[] = ['name', 'address', 'city', 'phone', 'description'];
+                const fieldErrors: Partial<CafeFormData> = {};
+                const rest: string[] = [];
+
+                for (const [key, value] of Object.entries(errs || {})) {
+                    const message = Array.isArray(value) ? value.join(' ') : String(value ?? '');
+
+                    if ((known as string[]).includes(key)) {
+                        fieldErrors[key as keyof CafeFormData] = message;
+                    } else if (message) {
+                        rest.push(message);
+                    }
+                }
+
+                setErrors(fieldErrors);
+                setFormError(rest.join(' '));
+                setProcessing(false);
+            },
         };
 
         if (cafe) {
-            router.put(`/owner/cafes/${cafe.id}`, form, opts);
+            router.put(`/owner/cafes/${cafe.id}`, payload, opts);
         } else {
-            router.post('/owner/cafes', form, opts);
+            router.post('/owner/cafes', payload, opts);
         }
     };
 
     const startEdit = () => {
-        setForm({ name: cafe?.name || '', address: cafe?.address || '', phone: cafe?.phone || '', description: cafe?.description || '' });
+        setForm({ name: cafe?.name || '', address: cafe?.address || '', city: cafe?.city || '', phone: cafe?.phone || '', description: cafe?.description || '' });
         setIsEditing(true);
     };
 
@@ -262,6 +281,11 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {formError && (
+                                <p className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold">
+                                    <AlertCircle className="size-4 shrink-0" />{formError}
+                                </p>
+                            )}
                             {/* Nama Cafe */}
                             <div>
                                 <label className="block text-xs font-bold text-stone-700 mb-1.5">Nama Cafe <span className="text-rose-500">*</span></label>
@@ -270,9 +294,11 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                                     value={form.name}
                                     onChange={handleChange('name')}
                                     placeholder="contoh: Kopi Nusantara"
+                                    maxLength={CAFE_PROFILE_FIELDS.name.max}
                                     className={`w-full px-3.5 py-2.5 text-sm border rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all ${errors.name ? 'border-rose-400' : 'border-stone-200 focus:border-orange-500'}`}
                                 />
                                 {errors.name && <p className="mt-1 text-xs text-rose-600">{errors.name}</p>}
+                                {!errors.name && <p className="mt-1 text-[11px] text-stone-400">Contoh: {CAFE_PROFILE_FIELDS.name.example}</p>}
                             </div>
 
                             {/* Alamat */}
@@ -283,9 +309,26 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                                     value={form.address}
                                     onChange={handleChange('address')}
                                     placeholder="contoh: Jl. Sudirman No. 1, Jakarta Pusat"
+                                    maxLength={CAFE_PROFILE_FIELDS.address.max}
                                     className={`w-full px-3.5 py-2.5 text-sm border rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all ${errors.address ? 'border-rose-400' : 'border-stone-200 focus:border-orange-500'}`}
                                 />
                                 {errors.address && <p className="mt-1 text-xs text-rose-600">{errors.address}</p>}
+                                {!errors.address && <p className="mt-1 text-[11px] text-stone-400">Contoh: {CAFE_PROFILE_FIELDS.address.example}</p>}
+                            </div>
+
+                            {/* Kota */}
+                            <div>
+                                <label className="block text-xs font-bold text-stone-700 mb-1.5">Kota <span className="text-rose-500">*</span></label>
+                                <input
+                                    type="text"
+                                    value={form.city}
+                                    onChange={handleChange('city')}
+                                    placeholder="contoh: Bandar Lampung"
+                                    maxLength={CAFE_PROFILE_FIELDS.city.max}
+                                    className={`w-full px-3.5 py-2.5 text-sm border rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 transition-all ${errors.city ? 'border-rose-400' : 'border-stone-200 focus:border-orange-500'}`}
+                                />
+                                {errors.city && <p className="mt-1 text-xs text-rose-600">{errors.city}</p>}
+                                {!errors.city && <p className="mt-1 text-[11px] text-stone-400">Contoh: {CAFE_PROFILE_FIELDS.city.example}</p>}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -294,11 +337,16 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                                     <label className="block text-xs font-bold text-stone-700 mb-1.5">No. Telepon Kontak</label>
                                     <input
                                         type="text"
+                                        inputMode="tel"
+                                        autoComplete="tel"
                                         value={form.phone}
                                         onChange={handleChange('phone')}
                                         placeholder="08xxxxxxxxxx"
-                                        className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all"
+                                        maxLength={CAFE_PROFILE_FIELDS.phone.max}
+                                        className={`w-full px-3.5 py-2.5 text-sm border rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all ${errors.phone ? 'border-rose-400' : 'border-stone-200'}`}
                                     />
+                                    {errors.phone && <p className="mt-1 text-xs text-rose-600">{errors.phone}</p>}
+                                    {!errors.phone && <p className="mt-1 text-[11px] text-stone-400">Angka, spasi, dan + - ( ). Contoh: {CAFE_PROFILE_FIELDS.phone.example}</p>}
                                 </div>
 
                                 {/* Deskripsi */}
@@ -309,8 +357,11 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                                         value={form.description}
                                         onChange={handleChange('description')}
                                         placeholder="Cafe kopi premium dengan suasana nyaman..."
-                                        className="w-full px-3.5 py-2.5 text-sm border border-stone-200 rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all"
+                                        maxLength={CAFE_PROFILE_FIELDS.description.max}
+                                        className={`w-full px-3.5 py-2.5 text-sm border rounded-xl bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all ${errors.description ? 'border-rose-400' : 'border-stone-200'}`}
                                     />
+                                    {errors.description && <p className="mt-1 text-xs text-rose-600">{errors.description}</p>}
+                                    {!errors.description && <p className="mt-1 text-[11px] text-stone-400">Contoh: {CAFE_PROFILE_FIELDS.description.example}</p>}
                                 </div>
                             </div>
 
@@ -398,7 +449,7 @@ export default function OwnerCafes(props: OwnerCafesProps) {
                                     <h2 className="text-xl font-bold text-stone-900">{cafe.name}</h2>
                                     <p className="text-xs text-stone-500 flex items-center gap-1.5 mt-0.5">
                                         <MapPin className="size-3.5 text-orange-500" />
-                                        <span>{cafe.address || 'Alamat belum diatur'}</span>
+                                        <span>{[cafe.address, cafe.city].filter(Boolean).join(', ') || 'Alamat belum diatur'}</span>
                                     </p>
                                 </div>
                             </div>

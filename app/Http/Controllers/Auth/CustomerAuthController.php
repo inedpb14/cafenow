@@ -189,7 +189,13 @@ class CustomerAuthController extends Controller
     {
         $dto = $request->validated();
 
-        $status = Password::sendResetLink(['email' => $dto['email']]);
+        try {
+            $status = Password::sendResetLink(['email' => $dto['email']]);
+        } catch (\Throwable $e) {
+            // ponytail: token sudah tersimpan di broker; gagal kirim email jangan jadi 500
+            report($e);
+            $status = Password::RESET_LINK_SENT;
+        }
 
         return response()->json([
             'success' => true,

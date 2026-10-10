@@ -13,6 +13,7 @@ use App\Models\MenuItem;
 use App\Models\MenuOrder;
 use App\Models\Payment;
 use App\Models\Table;
+use App\Services\Cafe\CafeProfileInput;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -165,6 +166,7 @@ class OwnerDashboardController extends Controller
                 'name' => $cafe->name,
                 'slug' => $cafe->slug ?? '',
                 'address' => $cafe->address ?? '',
+                'city' => $cafe->city ?? '',
                 'phone' => $cafe->contact_whatsapp ?? '',
                 'description' => $cafe->description ?? '',
                 'facilities' => $cafe->facilities ?? [],
@@ -456,17 +458,13 @@ class OwnerDashboardController extends Controller
             return back()->with('error', 'Anda sudah memiliki profil cafe.');
         }
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'address' => ['required', 'string', 'max:500'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'description' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validate(CafeProfileInput::rules());
 
         Cafe::create([
             'owner_id' => $user->id,
             'name' => $validated['name'],
             'address' => $validated['address'],
+            'city' => $validated['city'],
             'contact_whatsapp' => $validated['phone'] ?? null,
             'description' => $validated['description'] ?? null,
             'approval_status' => CafeApprovalStatus::Pending->value,
@@ -490,16 +488,12 @@ class OwnerDashboardController extends Controller
             return back()->with('error', 'Cafe tidak dapat diubah pada status saat ini.');
         }
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'address' => ['required', 'string', 'max:500'],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'description' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validate(CafeProfileInput::rules());
 
         $cafe->update([
             'name' => $validated['name'],
             'address' => $validated['address'],
+            'city' => $validated['city'],
             'contact_whatsapp' => $validated['phone'] ?? null,
             'description' => $validated['description'] ?? null,
         ]);

@@ -11,6 +11,7 @@ use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\EnsureCafeApproved;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SanitizeCafeInput;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -47,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => CheckRole::class,
             'admin' => AdminMiddleware::class,
             'cafe.approved' => EnsureCafeApproved::class,
+            'cafe.input' => SanitizeCafeInput::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

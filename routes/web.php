@@ -87,8 +87,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:owner'])->group(function () {
         // Cafe CRUD — always available so a pending/rejected owner can complete and submit the profile
         Route::get('owner/cafes', [OwnerDashboardController::class, 'cafes'])->name('owner.cafes.index');
-        Route::post('owner/cafes', [OwnerDashboardController::class, 'storeCafe'])->name('owner.cafes.store');
-        Route::put('owner/cafes/{cafe}', [OwnerDashboardController::class, 'updateCafe'])->name('owner.cafes.update');
+        Route::post('owner/cafes', [OwnerDashboardController::class, 'storeCafe'])->middleware('cafe.input')->name('owner.cafes.store');
+        Route::put('owner/cafes/{cafe}', [OwnerDashboardController::class, 'updateCafe'])->middleware('cafe.input')->name('owner.cafes.update');
         Route::post('owner/cafes/{cafe}/hours', [OwnerDashboardController::class, 'saveHours'])->name('owner.cafes.hours');
         Route::post('owner/cafes/{cafe}/photos', [OwnerDashboardController::class, 'uploadCafePhotos'])->name('owner.cafes.photos');
 

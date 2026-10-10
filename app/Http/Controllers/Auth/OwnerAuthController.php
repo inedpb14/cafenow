@@ -79,7 +79,12 @@ class OwnerAuthController extends Controller
     {
         $dto = $request->validated();
 
-        Password::sendResetLink(['email' => $dto['email']]);
+        try {
+            Password::sendResetLink(['email' => $dto['email']]);
+        } catch (\Throwable $e) {
+            // ponytail: token sudah tersimpan di broker; gagal kirim email jangan jadi 500
+            report($e);
+        }
 
         return response()->json([
             'success' => true,

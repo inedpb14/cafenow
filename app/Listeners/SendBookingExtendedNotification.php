@@ -35,13 +35,18 @@ readonly class SendBookingExtendedNotification
             'delivery_status' => 'sent',
         ]);
 
-        Mail::to($booking->customer->email)->send(new BookingNotificationMail(
-            $subject,
-            $message,
-            $booking->booking_reference,
-            $booking->cafe->name,
-            $booking->booking_date->format('Y-m-d'),
-            $booking->start_time->format('H:i'),
-        ));
+        try {
+            Mail::to($booking->customer->email)->send(new BookingNotificationMail(
+                $subject,
+                $message,
+                $booking->booking_reference,
+                $booking->cafe->name,
+                $booking->booking_date->format('Y-m-d'),
+                $booking->start_time->format('H:i'),
+            ));
+        } catch (\Throwable $e) {
+            // ponytail: notifikasi DB sudah tersimpan; gagal SMTP jangan 500-kan extend
+            report($e);
+        }
     }
 }
