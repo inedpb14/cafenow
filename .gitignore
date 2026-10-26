@@ -27,6 +27,8 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+.cafe_now.sql
+.gitignore
 
 # -------------------------------------------------------
 # AI Agent configuration — jangan di-commit ke GitHub

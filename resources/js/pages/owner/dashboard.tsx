@@ -257,12 +257,12 @@ export default function OwnerDashboard(props: OwnerDashboardProps) {
                             <span className="text-xs font-bold text-stone-800">Order Dapur</span>
                         </Link>
 
-                        <Link href="/owner/analytics" className="group rounded-2xl border border-stone-200/80 bg-white p-4 hover:border-orange-400 hover:shadow-md transition-all flex flex-col items-center text-center space-y-2">
+                        {/* <Link href="/owner/analytics" className="group rounded-2xl border border-stone-200/80 bg-white p-4 hover:border-orange-400 hover:shadow-md transition-all flex flex-col items-center text-center space-y-2">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-orange-500 group-hover:text-white transition-colors">
                                 <BarChart3 className="size-5" />
                             </div>
                             <span className="text-xs font-bold text-stone-800">Analytics</span>
-                        </Link>
+                        </Link> */}
 
                     </div>
                 </div>
@@ -447,9 +447,9 @@ export default function OwnerDashboard(props: OwnerDashboardProps) {
                             <BarChart3 className="size-5 text-orange-600" />
                             <h3 className="text-base font-bold text-stone-900">Grafik Ringkasan Pendapatan 7 Hari Terakhir</h3>
                         </div>
-                        <Link href="/owner/analytics" className="text-xs text-orange-600 hover:underline font-semibold">
+                        {/* <Link href="/owner/analytics" className="text-xs text-orange-600 hover:underline font-semibold">
                             Laporan Lengkap
-                        </Link>
+                        </Link> */}
                     </div>
 
                     <div className="h-48 flex items-end justify-between gap-3 pt-6 px-4">

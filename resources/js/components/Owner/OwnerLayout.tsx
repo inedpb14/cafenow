@@ -7,7 +7,7 @@ import {
     Utensils, 
     Calendar, 
     ChefHat, 
-    BarChart3, 
+    // BarChart3, 
     LogOut, 
     Coffee,
     ChevronRight,
@@ -46,7 +46,7 @@ export default function OwnerLayout({ children, breadcrumbs }: OwnerLayoutProps)
         { name: 'Dashboard Utama', href: '/owner/dashboard', icon: LayoutDashboard },
         { name: 'Daftar Booking', href: '/owner/bookings', icon: Calendar },
         { name: 'Order Dapur Live', href: '/owner/orders', icon: ChefHat },
-        { name: 'Analitik Bisnis', href: '/owner/analytics', icon: BarChart3 },
+        // { name: 'Analitik Bisnis', href: '/owner/analytics', icon: BarChart3 },
         { name: 'Pengaturan', href: '/settings/profile', icon: Settings },
     ];
 

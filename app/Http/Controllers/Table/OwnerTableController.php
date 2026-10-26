@@ -57,6 +57,17 @@ class OwnerTableController extends Controller
 
         $table = Table::create($data);
 
+        // Rule wajib ada: halaman booking customer hanya menampilkan meja yang punya booking rule
+        $table->bookingRule()->create([
+            'rule_type' => 'fixed',
+            'price' => (float) ($table->min_spend ?? 0),
+            'duration_minutes' => 120,
+            'min_duration_minutes' => 30,
+            'max_duration_minutes' => 240,
+            'max_bookings_per_slot' => 1,
+            'min_advance_hours' => 1,
+        ]);
+
         return response()->json([
             'success' => true,
             'data' => new TableResource($table),

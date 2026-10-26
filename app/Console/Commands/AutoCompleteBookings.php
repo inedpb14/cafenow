@@ -17,8 +17,9 @@ class AutoCompleteBookings extends Command
     public function handle(): int
     {
         $now = Carbon::now()->format('Y-m-d H:i:s');
+        // CONCAT: '||' adalah logical OR di MySQL, bukan concat — filter waktu lewat tanpa menyaring apa pun
         $count = Booking::where('status', 'confirmed')
-            ->whereRaw("(booking_date || ' ' || end_time) <= ?", [$now])
+            ->whereRaw("CONCAT(booking_date, ' ', end_time) <= ?", [$now])
             ->whereNotNull('check_in_time')
             ->whereNull('check_out_time')
             ->update([

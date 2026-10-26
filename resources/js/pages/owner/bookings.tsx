@@ -1,7 +1,4 @@
-import { useState } from 'react';
-import OwnerLayout from '@/components/Owner/OwnerLayout';
-import { Head, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Search,
     Filter,
@@ -12,8 +9,12 @@ import {
     X,
     Clock,
     Users,
-    CreditCard
+    CreditCard,
+    AlertCircle
 } from 'lucide-react';
+import { useState } from 'react';
+import OwnerLayout from '@/components/Owner/OwnerLayout';
+import { Button } from '@/components/ui/button';
 
 interface Booking {
     id: string;
@@ -28,10 +29,6 @@ interface Booking {
     status: string;
     paymentStatus?: string;
     notes?: string | null;
-}
-
-interface OwnerBookingsProps {
-    bookings?: Booking[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -62,12 +59,17 @@ const statusBadge = (status: string) => {
     }
 };
 
-export default function OwnerBookings(props: OwnerBookingsProps) {
+export default function OwnerBookings() {
+    const { props: pageProps } = usePage() as { props: { bookings?: Booking[]; flash: Record<string, string> } };
+    const flash = pageProps.flash || {};
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [detailBooking, setDetailBooking] = useState<Booking | null>(null);
+    const [selectedId, setSelectedId] = useState<number | null>(null);
 
-    const bookingsList = props.bookings ?? [];
+    const bookingsList = pageProps.bookings ?? [];
+
+    // Modal selalu baca data terbaru dari props, bukan snapshot saat diklik
+    const detailBooking = selectedId === null ? null : bookingsList.find(b => b.raw_id === selectedId) ?? null;
 
     const handleCheckIn = (rawId: number) => {
         router.post(`/owner/bookings/${rawId}/check-in`, {}, { preserveScroll: true });
@@ -80,6 +82,7 @@ export default function OwnerBookings(props: OwnerBookingsProps) {
     const filteredBookings = bookingsList.filter(b => {
         const matchesSearch = b.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || b.id.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+
         return matchesSearch && matchesStatus;
     });
 
@@ -99,6 +102,20 @@ export default function OwnerBookings(props: OwnerBookingsProps) {
                         <span>Export CSV</span>
                     </Button>
                 </div>
+
+                {/* Flash Messages */}
+                {flash.success && (
+                    <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-semibold">
+                        <CheckCircle2 className="size-5 shrink-0" />
+                        <span>{flash.success}</span>
+                    </div>
+                )}
+                {flash.error && (
+                    <div className="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 font-semibold">
+                        <AlertCircle className="size-5 shrink-0" />
+                        <span>{flash.error}</span>
+                    </div>
+                )}
 
                 {/* Filters & Search */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
@@ -157,7 +174,7 @@ export default function OwnerBookings(props: OwnerBookingsProps) {
                                     {filteredBookings.map((b) => (
                                         <tr
                                             key={b.id}
-                                            onClick={() => setDetailBooking(b)}
+                                            onClick={() => setSelectedId(b.raw_id)}
                                             className="hover:bg-stone-50/80 transition-colors cursor-pointer"
                                         >
                                             <td className="px-6 py-4">
@@ -206,7 +223,7 @@ export default function OwnerBookings(props: OwnerBookingsProps) {
                                     {STATUS_LABELS[detailBooking.status] || detailBooking.status}
                                 </span>
                             </h3>
-                            <button onClick={() => setDetailBooking(null)} className="text-stone-400 hover:text-stone-700 transition-colors cursor-pointer">
+                            <button onClick={() => setSelectedId(null)} className="text-stone-400 hover:text-stone-700 transition-colors cursor-pointer">
                                 <X className="size-5" />
                             </button>
                         </div>
@@ -275,7 +292,7 @@ export default function OwnerBookings(props: OwnerBookingsProps) {
                             {!inArray(detailBooking.status, ['confirmed', 'checked_in']) && (
                                 <span className="text-[11px] text-stone-400 font-semibold">Tidak ada aksi untuk status ini</span>
                             )}
-                            <Button variant="outline" size="sm" onClick={() => setDetailBooking(null)} className="h-9 rounded-lg text-xs font-semibold border-stone-300">
+                            <Button variant="outline" size="sm" onClick={() => setSelectedId(null)} className="h-9 rounded-lg text-xs font-semibold border-stone-300">
                                 Tutup
                             </Button>
                         </div>

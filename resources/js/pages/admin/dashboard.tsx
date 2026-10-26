@@ -13,8 +13,8 @@ import {
   Activity as ActivityIcon,
   ArrowUpRight,
   CheckSquare,
-  RotateCcw,
-  Coins,
+  // RotateCcw,
+  // Coins,
   ClipboardList,
   RefreshCw
 } from 'lucide-react';
@@ -95,6 +95,7 @@ export default function Dashboard({ metrics }: DashboardProps) {
               subtitle={`${metrics.pendingApprovals} perlu ditinjau`}
             />
 
+            {/*
             <QuickAction
               href="/admin/refunds"
               icon={RotateCcw}
@@ -108,6 +109,7 @@ export default function Dashboard({ metrics }: DashboardProps) {
               title="Atur Komisi"
               subtitle="Aturan komisi"
             />
+            */}
 
             <QuickAction
               href="/admin/audit-logs"

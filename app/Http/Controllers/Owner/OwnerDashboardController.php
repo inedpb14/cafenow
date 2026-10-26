@@ -390,6 +390,18 @@ class OwnerDashboardController extends Controller
             abort(403, 'Akses tidak diizinkan untuk booking ini.');
         }
 
+        if (! in_array($booking->status, ['confirmed'], true)) {
+            return back()->with('error', 'Booking yang bisa di-check-in harus berstatus confirmed.');
+        }
+
+        if ($booking->booking_date->toDateString() !== now()->toDateString()) {
+            return back()->with('error', 'Check-in hanya dapat dilakukan pada tanggal booking.');
+        }
+
+        if ($booking->check_in_time !== null) {
+            return back()->with('error', 'Booking sudah check-in sebelumnya.');
+        }
+
         $booking->update([
             'status' => 'checked_in',
             'check_in_time' => now(),
@@ -411,6 +423,10 @@ class OwnerDashboardController extends Controller
 
         if (! $cafe || $booking->cafe_id !== $cafe->id) {
             abort(403, 'Akses tidak diizinkan untuk booking ini.');
+        }
+
+        if ($booking->status !== 'checked_in') {
+            return back()->with('error', 'Hanya booking yang sudah check-in yang dapat diselesaikan.');
         }
 
         $booking->update([
@@ -613,7 +629,18 @@ class OwnerDashboardController extends Controller
             $data['photo'] = $path;
         }
 
-        Table::create($data);
+        $table = Table::create($data);
+
+        // Rule wajib ada: halaman booking customer hanya menampilkan meja yang punya booking rule
+        $table->bookingRule()->create([
+            'rule_type' => 'fixed',
+            'price' => $data['min_spend'],
+            'duration_minutes' => 120,
+            'min_duration_minutes' => 30,
+            'max_duration_minutes' => 240,
+            'max_bookings_per_slot' => 1,
+            'min_advance_hours' => 1,
+        ]);
 
         return redirect()->route('owner.cafes.tables')->with('success', 'Meja baru berhasil ditambahkan.');
     }
