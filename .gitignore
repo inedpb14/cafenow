@@ -66,11 +66,11 @@ yarn-error.log
 # -------------------------------------------------------
 # Test artifacts
 # -------------------------------------------------------
-/tests/
+# /tests/
 /e2e/
 /testsprite_tests/
 /test-results/
-/phpunit.xml
+# /phpunit.xml
 /pnpm-workspace.yaml
 
 # local session-cookie test artifacts
