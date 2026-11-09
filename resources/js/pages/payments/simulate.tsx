@@ -1,6 +1,15 @@
-import { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { CreditCard, QrCode, Landmark, Smartphone, ShieldCheck, AlertTriangle } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Clock,
+    CreditCard,
+    Landmark,
+    QrCode,
+    ShieldCheck,
+    Smartphone,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SimulatePaymentProps {
@@ -8,133 +17,446 @@ interface SimulatePaymentProps {
         order_id: string;
         amount: number;
         status: string;
+        booking_reference: string | null;
+        expires_at: string | null;
     };
 }
 
-const METHODS = [
-    { id: 'qris', label: 'QRIS', desc: 'Scan & bayar dengan e-wallet / m-banking', icon: QrCode },
-    { id: 'va', label: 'Virtual Account', desc: 'Transfer bank BCA, BNI, BRI, Mandiri', icon: Landmark },
-    { id: 'ewallet', label: 'E-Wallet', desc: 'GoPay, OVO, Dana, ShopeePay', icon: Smartphone },
+type MethodId = 'qris' | 'va' | 'ewallet';
+
+interface MethodOption {
+    id: MethodId;
+    label: string;
+    desc: string;
+    icon: typeof QrCode;
+}
+
+interface ChannelOption {
+    id: string;
+    label: string;
+}
+
+const METHODS: MethodOption[] = [
+    {
+        id: 'qris',
+        label: 'QRIS',
+        desc: 'Scan & bayar dengan e-wallet / m-banking',
+        icon: QrCode,
+    },
+    {
+        id: 'va',
+        label: 'Virtual Account',
+        desc: 'Transfer bank BCA, BNI, BRI, Mandiri',
+        icon: Landmark,
+    },
+    {
+        id: 'ewallet',
+        label: 'E-Wallet',
+        desc: 'GoPay, OVO, Dana, ShopeePay',
+        icon: Smartphone,
+    },
 ];
 
+const VA_BANKS: ChannelOption[] = [
+    { id: 'bca', label: 'BCA' },
+    { id: 'bni', label: 'BNI' },
+    { id: 'bri', label: 'BRI' },
+    { id: 'mandiri', label: 'Mandiri' },
+];
+
+const EWALLETS: ChannelOption[] = [
+    { id: 'gopay', label: 'GoPay' },
+    { id: 'ovo', label: 'OVO' },
+    { id: 'dana', label: 'Dana' },
+    { id: 'shopeepay', label: 'ShopeePay' },
+];
+
+const formatCountdown = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+
+    return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+};
+
+const vaNumber = (orderId: string): string => {
+    const digits = orderId.replace(/\D/g, '').padEnd(10, '7').slice(0, 10);
+
+    return `8808 ${digits.slice(0, 4)} ${digits.slice(4, 8)} ${digits.slice(8)}`;
+};
+
 export default function SimulatePayment({ payment }: SimulatePaymentProps) {
-    const [method, setMethod] = useState<string | null>(null);
+    const [method, setMethod] = useState<MethodId | null>(null);
+    const [channel, setChannel] = useState('');
+    const [phone, setPhone] = useState('');
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState('');
+    const [remaining, setRemaining] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (!payment.expires_at) {
+            return;
+        }
+
+        const expiresAt = new Date(payment.expires_at).getTime();
+
+        const tick = () => {
+            setRemaining(
+                Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)),
+            );
+        };
+
+        tick();
+        const timer = window.setInterval(tick, 1000);
+
+        return () => {
+            window.clearInterval(timer);
+        };
+    }, [payment.expires_at]);
+
+    const selectedMethod = METHODS.find((item) => item.id === method) ?? null;
+    const expired = remaining !== null && remaining <= 0;
+
+    const chooseMethod = (id: MethodId) => {
+        setMethod(id);
+        setChannel('');
+        setPhone('');
+        setError('');
+    };
+
+    const changeMethod = () => {
+        setMethod(null);
+        setChannel('');
+        setPhone('');
+        setError('');
+    };
 
     const submit = () => {
         if (!method) {
-            setError('Pilih salah satu metode pembayaran terlebih dahulu.');
+            return;
+        }
+
+        if (expired) {
+            setError('Waktu pembayaran sudah habis.');
+
+            return;
+        }
+
+        if (method !== 'qris' && channel === '') {
+            setError(
+                method === 'va'
+                    ? 'Pilih bank terlebih dahulu.'
+                    : 'Pilih e-wallet terlebih dahulu.',
+            );
+
+            return;
+        }
+
+        if (method === 'ewallet' && phone.trim() === '') {
+            setError('Masukkan nomor HP terlebih dahulu.');
+
             return;
         }
 
         setProcessing(true);
         setError('');
 
-        router.post(`/payments/${payment.order_id}/simulate`, { method }, {
-            onError: (errs: any) => {
-                setError(Object.values(errs)[0] as string || 'Gagal memproses pembayaran.');
-                setProcessing(false);
+        router.post(
+            `/payments/${payment.order_id}/simulate`,
+            {
+                method,
+                channel: method === 'qris' ? undefined : channel,
             },
-        });
+            {
+                onError: (errs: Record<string, string>) => {
+                    setError(
+                        Object.values(errs)[0] ?? 'Gagal memproses pembayaran.',
+                    );
+                },
+                onFinish: () => {
+                    setProcessing(false);
+                },
+            },
+        );
+    };
+
+    const submitLabel = (): string => {
+        if (method === 'qris') {
+            return 'Saya sudah bayar';
+        }
+
+        if (method === 'va') {
+            return 'Saya sudah transfer';
+        }
+
+        return 'Konfirmasi pembayaran';
     };
 
     return (
         <>
             <Head title="Simulasi Pembayaran - CafeNow" />
 
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-                <div className="border-b-2 border-[var(--text)] pb-6 mb-6">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 border-2 border-[var(--text)] shadow-[2px_2px_0_var(--text)] text-xs font-bold uppercase tracking-wider mb-3">
+            <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+                <div className="mb-6 border-b-2 border-[var(--text)] pb-6">
+                    <div className="mb-3 inline-flex items-center gap-2 border-2 border-[var(--text)] bg-amber-100 px-3 py-1 text-xs font-bold tracking-wider uppercase shadow-[2px_2px_0_var(--text)]">
                         <CreditCard className="size-4 text-[var(--primary)]" />
                         <span>Sandbox Payment Gateway</span>
                     </div>
-                    <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-[var(--text)]">
+                    <h1 className="font-serif text-3xl font-extrabold text-[var(--text)] sm:text-4xl">
                         Simulasi Pembayaran
                     </h1>
-                    <p className="text-[var(--text-muted)] text-xs sm:text-sm font-medium mt-2">
-                        Mode dummy — belum terhubung ke Midtrans. Pilih metode untuk mengunci reservasi.
+                    <p className="mt-2 text-xs font-medium text-[var(--text-muted)] sm:text-sm">
+                        Mode dummy — belum terhubung ke Midtrans. Pilih metode
+                        untuk mengunci reservasi.
                     </p>
                 </div>
 
                 <div className="space-y-6">
-                    <div className="block-card p-4 bg-[var(--bg-warm)] border-2 border-[var(--text)] flex justify-between items-center">
+                    <div className="block-card flex items-center justify-between gap-4 border-2 border-[var(--text)] bg-[var(--bg-warm)] p-4">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Ref Order</p>
-                            <p className="font-mono text-sm font-bold text-[var(--text)]">#{payment.order_id}</p>
+                            <p className="text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                                Ref Order
+                            </p>
+                            <p className="font-mono text-sm font-bold text-[var(--text)]">
+                                #{payment.order_id}
+                            </p>
+                            {payment.booking_reference && (
+                                <p className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
+                                    Booking {payment.booking_reference}
+                                </p>
+                            )}
                         </div>
                         <div className="text-right">
-                            <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Total Tagihan</p>
+                            <p className="text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                                Total Tagihan
+                            </p>
                             <p className="text-xl font-extrabold text-[var(--primary)]">
-                                Rp {(payment.amount || 0).toLocaleString('id-ID')}
+                                Rp{' '}
+                                {(payment.amount || 0).toLocaleString('id-ID')}
                             </p>
                         </div>
                     </div>
 
-                    <div className="block-card p-6 bg-white border-2 border-[var(--text)] space-y-4">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text)]">
-                            Pilih Metode Pembayaran
-                        </label>
+                    {method === null ? (
+                        <div className="block-card space-y-4 border-2 border-[var(--text)] bg-white p-6">
+                            <label className="block text-xs font-bold tracking-wider text-[var(--text)] uppercase">
+                                Pilih Metode Pembayaran
+                            </label>
 
-                        <div className="space-y-3">
-                            {METHODS.map((m) => {
-                                const Icon = m.icon;
-                                const isSelected = method === m.id;
-                                return (
-                                    <button
-                                        key={m.id}
-                                        type="button"
-                                        onClick={() => { setMethod(m.id); setError(''); }}
-                                        className={cn(
-                                            'w-full p-4 border-2 border-[var(--text)] transition-all cursor-pointer flex items-center gap-4 text-left',
-                                            isSelected
-                                                ? 'bg-amber-100 border-[var(--primary)] shadow-[4px_4px_0_var(--text)]'
-                                                : 'bg-white hover:bg-stone-50'
-                                        )}
-                                    >
-                                        <div className={cn(
-                                            'size-11 border-2 border-[var(--text)] flex items-center justify-center shrink-0',
-                                            isSelected ? 'bg-[var(--primary)] text-white' : 'bg-[var(--bg-warm)] text-[var(--primary)]'
-                                        )}>
-                                            <Icon className="size-5" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-serif font-bold text-sm text-[var(--text)]">{m.label}</p>
-                                            <p className="text-xs text-[var(--text-muted)]">{m.desc}</p>
-                                        </div>
-                                        {isSelected && (
-                                            <span className="text-[10px] font-extrabold uppercase bg-[var(--primary)] text-white px-2 py-1 border border-[var(--text)]">
-                                                Dipilih
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                            <div className="space-y-3">
+                                {METHODS.map((item) => {
+                                    const Icon = item.icon;
 
-                        {error && (
-                            <div className="p-3 bg-red-50 border-2 border-red-400 text-xs text-red-800 flex items-start gap-2">
-                                <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                                <p className="leading-relaxed font-medium">{error}</p>
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => {
+                                                chooseMethod(item.id);
+                                            }}
+                                            className="flex w-full cursor-pointer items-center gap-4 border-2 border-[var(--text)] bg-white p-4 text-left transition-all hover:bg-stone-50"
+                                        >
+                                            <div className="flex size-11 shrink-0 items-center justify-center border-2 border-[var(--text)] bg-[var(--bg-warm)] text-[var(--primary)]">
+                                                <Icon className="size-5" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-serif text-sm font-bold text-[var(--text)]">
+                                                    {item.label}
+                                                </p>
+                                                <p className="text-xs text-[var(--text-muted)]">
+                                                    {item.desc}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                        )}
-
-                        <div className="p-4 bg-amber-50 border-2 border-amber-400 text-xs text-amber-900 flex items-start gap-3">
-                            <ShieldCheck className="size-5 text-[var(--primary)] shrink-0 mt-0.5" />
-                            <p className="leading-relaxed font-medium">
-                                <strong>Simulasi:</strong> tidak ada uang sungguhan yang dipindahkan. Pembayaran langsung
-                                ditandai lunas untuk menguji alur reservasi.
-                            </p>
                         </div>
+                    ) : (
+                        <div className="block-card space-y-5 border-2 border-[var(--text)] bg-white p-6">
+                            <div className="flex items-start justify-between gap-3 border-b-2 border-[var(--text)] pb-4">
+                                <div>
+                                    <p className="text-[10px] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                                        Metode dipilih
+                                    </p>
+                                    <p className="font-serif text-lg font-bold text-[var(--text)]">
+                                        {selectedMethod?.label}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={changeMethod}
+                                    className="inline-flex cursor-pointer items-center gap-1.5 border-2 border-[var(--text)] bg-white px-3 py-1.5 text-[10px] font-bold tracking-wider uppercase hover:bg-stone-50"
+                                >
+                                    <ArrowLeft className="size-3.5" />
+                                    Ganti metode
+                                </button>
+                            </div>
 
-                        <button
-                            type="button"
-                            disabled={processing}
-                            onClick={submit}
-                            className="btn-primary text-xs py-3.5 px-8 font-bold tracking-wider uppercase cursor-pointer disabled:opacity-50 w-full"
-                        >
-                            {processing ? 'Memproses Pembayaran...' : `Bayar Rp ${(payment.amount || 0).toLocaleString('id-ID')} (Simulasi)`}
-                        </button>
+                            {method === 'qris' && (
+                                <div className="space-y-3 text-center">
+                                    {/* shortcut: QR placeholder, ganti dengan aset QR asli saat tersedia */}
+                                    <div className="mx-auto flex size-48 items-center justify-center border-2 border-[var(--text)] bg-white">
+                                        <div>
+                                            <QrCode className="mx-auto size-16 text-[var(--text)]" />
+                                            <p className="mt-2 text-[10px] font-extrabold tracking-wider text-[var(--text)] uppercase">
+                                                QR Simulasi
+                                            </p>
+                                            <p className="text-[10px] text-[var(--text-muted)]">
+                                                Tidak untuk dipindai
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs font-medium text-[var(--text-muted)]">
+                                        QR pembayaran akan ditampilkan di area
+                                        ini.
+                                    </p>
+                                </div>
+                            )}
+
+                            {method === 'va' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold tracking-wider text-[var(--text)] uppercase">
+                                            Pilih bank
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                            {VA_BANKS.map((bank) => (
+                                                <button
+                                                    key={bank.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setChannel(bank.id);
+                                                        setError('');
+                                                    }}
+                                                    className={cn(
+                                                        'cursor-pointer border-2 border-[var(--text)] px-3 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors',
+                                                        channel === bank.id
+                                                            ? 'bg-[var(--primary)] text-white'
+                                                            : 'bg-white text-[var(--text)] hover:bg-stone-50',
+                                                    )}
+                                                >
+                                                    {bank.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {channel !== '' && (
+                                        <div className="border-2 border-[var(--text)] bg-[var(--bg-warm)] p-4">
+                                            <p className="text-[10px] font-bold tracking-wider text-[var(--text-muted)] uppercase">
+                                                Nomor Virtual Account{' '}
+                                                {channel.toUpperCase()}
+                                            </p>
+                                            <p className="mt-1 font-mono text-lg font-extrabold tracking-wider text-[var(--text)]">
+                                                {vaNumber(payment.order_id)}
+                                            </p>
+                                            <p className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
+                                                Nomor simulasi — tidak untuk
+                                                transfer nyata.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {method === 'ewallet' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold tracking-wider text-[var(--text)] uppercase">
+                                            Pilih e-wallet
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                            {EWALLETS.map((wallet) => (
+                                                <button
+                                                    key={wallet.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setChannel(wallet.id);
+                                                        setError('');
+                                                    }}
+                                                    className={cn(
+                                                        'cursor-pointer border-2 border-[var(--text)] px-3 py-2.5 text-xs font-bold tracking-wider uppercase transition-colors',
+                                                        channel === wallet.id
+                                                            ? 'bg-[var(--primary)] text-white'
+                                                            : 'bg-white text-[var(--text)] hover:bg-stone-50',
+                                                    )}
+                                                >
+                                                    {wallet.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label
+                                            htmlFor="wallet-phone"
+                                            className="block text-xs font-bold tracking-wider text-[var(--text)] uppercase"
+                                        >
+                                            Nomor HP
+                                        </label>
+                                        <input
+                                            id="wallet-phone"
+                                            type="tel"
+                                            inputMode="numeric"
+                                            value={phone}
+                                            onChange={(event) => {
+                                                setPhone(event.target.value);
+                                                setError('');
+                                            }}
+                                            placeholder="08xxxxxxxxxx"
+                                            className="w-full border-2 border-[var(--text)] bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-[var(--primary)]"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {remaining !== null && (
+                                <div
+                                    className={cn(
+                                        'flex items-center gap-2 border-2 px-3 py-2 text-xs font-bold',
+                                        expired
+                                            ? 'border-red-400 bg-red-50 text-red-800'
+                                            : 'border-amber-400 bg-amber-50 text-amber-900',
+                                    )}
+                                >
+                                    <Clock className="size-4 shrink-0" />
+                                    <span>
+                                        {expired
+                                            ? 'Waktu pembayaran sudah habis'
+                                            : `Selesaikan dalam ${formatCountdown(remaining)}`}
+                                    </span>
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="flex items-start gap-2 border-2 border-red-400 bg-red-50 p-3 text-xs text-red-800">
+                                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                                    <p className="leading-relaxed font-medium">
+                                        {error}
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                disabled={processing || expired}
+                                onClick={submit}
+                                className="btn-primary w-full cursor-pointer px-8 py-3.5 text-xs font-bold tracking-wider uppercase disabled:opacity-50"
+                            >
+                                {processing
+                                    ? 'Memproses Pembayaran...'
+                                    : submitLabel()}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex items-start gap-3 border-2 border-amber-400 bg-amber-50 p-4 text-xs text-amber-900">
+                        <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[var(--primary)]" />
+                        <p className="leading-relaxed font-medium">
+                            <strong>Simulasi:</strong> tidak ada uang sungguhan
+                            yang dipindahkan. Pembayaran langsung ditandai lunas
+                            untuk menguji alur reservasi.
+                        </p>
                     </div>
                 </div>
             </div>

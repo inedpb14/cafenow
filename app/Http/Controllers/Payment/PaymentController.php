@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,7 +33,7 @@ class PaymentController extends Controller
         $user = $request->user();
         $payable = $payment->payable;
 
-        if ($payable !== null && ($payable instanceof \App\Models\Booking || $payable instanceof \App\Models\MenuOrder) && $payable->customer_id !== $user->id) {
+        if ($payable !== null && ($payable instanceof Booking || $payable instanceof MenuOrder) && $payable->customer_id !== $user->id) {
             abort(403);
         }
 
@@ -64,11 +65,20 @@ class PaymentController extends Controller
             return redirect()->route('customer.bookings.detail', $payment->payable_id);
         }
 
+        if (! $this->isPayableOpen($payment)) {
+            return redirect()->route('customer.bookings.detail', $payment->payable_id)
+                ->with('error', 'Pembayaran tidak dapat dilanjutkan karena reservasi sudah tidak aktif atau waktu habis.');
+        }
+
+        $payable = $payment->payable;
+
         return Inertia::render('payments/simulate', [
             'payment' => [
                 'order_id' => $payment->midtrans_order_id,
                 'amount' => (float) $payment->amount,
                 'status' => $payment->status,
+                'booking_reference' => $payable instanceof Booking ? $payable->booking_reference : null,
+                'expires_at' => $payable instanceof Booking ? $payable->lock_expires_at?->toIso8601String() : null,
             ],
         ]);
     }
@@ -79,8 +89,22 @@ class PaymentController extends Controller
      */
     public function simulatePay(Request $request, string $orderId): RedirectResponse
     {
+        $method = $request->string('method')->toString();
+
+        $channels = match ($method) {
+            'va' => ['bca', 'bni', 'bri', 'mandiri'],
+            'ewallet' => ['gopay', 'ovo', 'dana', 'shopeepay'],
+            default => [],
+        };
+
         $request->validate([
             'method' => ['required', 'string', 'in:qris,va,ewallet'],
+            'channel' => [
+                'nullable',
+                'string',
+                Rule::requiredIf(in_array($method, ['va', 'ewallet'], true)),
+                Rule::in($channels),
+            ],
         ]);
 
         $payment = Payment::where('midtrans_order_id', $orderId)->firstOrFail();
@@ -91,7 +115,15 @@ class PaymentController extends Controller
             return redirect()->route('customer.bookings.detail', $payment->payable_id);
         }
 
-        $payment->update(['payment_method' => $request->string('method')->toString()]);
+        if (! $this->isPayableOpen($payment)) {
+            return redirect()->route('customer.bookings.detail', $payment->payable_id)
+                ->with('error', 'Pembayaran tidak dapat dilanjutkan karena reservasi sudah tidak aktif atau waktu habis.');
+        }
+
+        $payment->update([
+            'payment_method' => $method,
+            'payment_channel' => $request->filled('channel') ? $request->string('channel')->toString() : null,
+        ]);
 
         $payload = [
             'order_id' => $payment->midtrans_order_id,
@@ -99,7 +131,7 @@ class PaymentController extends Controller
             'gross_amount' => (string) $payment->amount,
             'transaction_status' => 'settlement',
             'transaction_id' => 'dummy-tx-'.$payment->midtrans_order_id,
-            'payment_type' => $request->string('method')->toString(),
+            'payment_type' => $method,
             'merchant_id' => $this->midtransService->isDummyMode() ? 'dummy-merchant' : '',
         ];
 
@@ -146,17 +178,32 @@ class PaymentController extends Controller
         return redirect()->away($url);
     }
 
+    private function isPayableOpen(Payment $payment): bool
+    {
+        $payable = $payment->payable;
+
+        if (! $payable instanceof Booking) {
+            return true;
+        }
+
+        if (! in_array($payable->status, ['pending', 'confirmed'], true)) {
+            return false;
+        }
+
+        return $payable->lock_expires_at === null || ! $payable->lock_expires_at->isPast();
+    }
+
     private function authorizePayable(Request $request, Payment $payment): void
     {
         $payable = $payment->payable;
 
-        if ($payable === null || ! ($payable instanceof \App\Models\Booking || $payable instanceof \App\Models\MenuOrder) || $payable->customer_id !== $request->user()->id) {
+        if ($payable === null || ! ($payable instanceof Booking || $payable instanceof MenuOrder) || $payable->customer_id !== $request->user()->id) {
             abort(403);
         }
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function handleNotification(array $payload): JsonResponse
     {
